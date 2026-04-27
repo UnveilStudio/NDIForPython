@@ -26,3 +26,6 @@ Processing.NDI.Lib.x86.dll
 *.jpeg
 *.mp4
 *.mov
+!assets/*.png
+!assets/*.jpg
+!assets/*.jpeg
