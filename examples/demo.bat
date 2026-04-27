@@ -11,7 +11,9 @@ chcp 65001 >nul
 set PYTHONIOENCODING=utf-8
 
 start "NDIForPython sender" cmd /K "python ""%~dp0send_example.py"""
-timeout /t 2 /nobreak >nul
+REM 2-second pause without depending on `timeout` (Git-Bash users have a
+REM Unix `timeout` first in PATH that rejects /t).
+ping -n 3 127.0.0.1 >nul
 start "NDIForPython preview (cv2)" cmd /K "python ""%~dp0preview_example.py"""
 
 echo.
