@@ -73,11 +73,39 @@ In TouchDesigner / OBS / VLC, add an **NDI source** and you'll see
 See [`examples/send_example.py`](examples/send_example.py) for a runnable
 animated gradient sender.
 
-## Receiver?
+## Quick start — receive video
 
-Not implemented yet — the current package is sender-only. Receiver is on the
-roadmap; PRs welcome (the NDI receive API is a flat C API too, the binding
-shape will mirror `NDISender`).
+```python
+from ndi import NDISourceFinder, NDIReceiver
+
+# 1) Discover sources on the LAN
+with NDISourceFinder() as finder:
+    sources = finder.wait(timeout_ms=2000)
+print(sources)
+# ['MACHINE-NAME (My Source)', ...]
+
+# 2) Connect and pull frames
+with NDIReceiver(sources[0]) as rx:
+    while running:
+        with rx.receive(timeout_ms=33) as frame:
+            if not frame:                    # nothing arrived in time
+                continue
+            # frame.width, frame.height, frame.fourcc, frame.line_stride
+            arr = frame.as_numpy()           # zero-copy view, (H, W_padded, 4) uint8
+            do_inference(arr[:, :frame.width])     # drop stride padding
+```
+
+The default colour format is **`BGRX_BGRA`** — 4 bytes per pixel, alpha when
+the sender provides one, no chroma subsampling, no UYVY decode hassle. Pass
+`color_format=RECV_COLOR_RGBX_RGBA` if you want RGBA byte order instead.
+
+`frame.as_numpy()` is **zero-copy**: the array is a view into NDI's buffer
+and is invalidated when the `with` block exits or `frame.release()` is
+called. If you need to keep the data, copy it first
+(`np.array(view)` or `view.copy()`).
+
+See [`examples/receive_example.py`](examples/receive_example.py) for a
+runnable discover-and-print-FPS loop.
 
 ## How it works
 

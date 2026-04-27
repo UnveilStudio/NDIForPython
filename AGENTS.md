@@ -5,8 +5,8 @@ This file helps an AI agent (Claude Code, Cursor, Copilot, …) use
 
 ## TL;DR
 
-- `NDIForPython` exposes one class today: `NDISender`. Import path:
-  `from ndi import NDISender, FOURCC_BGRA, FOURCC_RGBA`.
+- `NDIForPython` exposes three classes: `NDISender`, `NDISourceFinder`, `NDIReceiver`.
+  Import path: `from ndi import NDISender, NDIReceiver, NDISourceFinder, FOURCC_BGRA`.
 - It's a `ctypes` wrapper over `Processing.NDI.Lib.x64.dll` (NDI Runtime).
 - **Windows x64 only** — `import ndi` raises `OSError` on other platforms.
 - **The DLL is NOT bundled** — the user must install the NDI Runtime
@@ -60,6 +60,40 @@ nd.send_frame(ctypes.addressof(buf), W, H, FOURCC_RGBA)
 
 For PyTorch, `tensor.detach().cpu().contiguous().numpy()` first.
 
+## Receiver pattern
+
+```python
+from ndi import NDISourceFinder, NDIReceiver
+
+# 1) Find an active source on the LAN.
+with NDISourceFinder() as finder:
+    names = finder.wait(timeout_ms=2000)
+if not names:
+    raise SystemExit("no NDI sources visible")
+
+# 2) Connect and pull frames.
+with NDIReceiver(names[0]) as rx:
+    while running:
+        with rx.receive(timeout_ms=33) as frame:
+            if not frame:                    # timeout, no data this tick
+                continue
+            arr = frame.as_numpy()           # zero-copy (H, W_padded, 4) uint8
+            arr = arr[:, :frame.width]       # drop stride-padding columns
+            process(arr)
+```
+
+Notes:
+- Default colour format is `RECV_COLOR_BGRX_BGRA` (4-channel, no chroma subsample).
+  Pass `color_format=RECV_COLOR_RGBX_RGBA` for RGBA byte order.
+- `frame.as_numpy()` is **zero-copy**. The view dies when the `with` block
+  exits — copy it (`view.copy()` / `np.array(view)`) if you need to keep it.
+- `rx.receive()` returns a falsy `_NoFrame` placeholder on timeout; the
+  outer `with` is still safe (`__enter__` returns `None` in that case).
+- `line_stride` is often `width * 4` but may be larger (alignment). Always
+  index columns up to `frame.width`.
+- Audio and metadata frames are silently dropped (we pass `NULL` for those
+  pointers to the SDK).
+
 ## Things to NOT do
 
 - **Do not bundle `Processing.NDI.Lib.x64.dll` with this package.** Vizrt's
@@ -73,14 +107,6 @@ For PyTorch, `tensor.detach().cpu().contiguous().numpy()` first.
 - **Do not use NDI to send sensitive content over an untrusted LAN.** NDI is
   cleartext on the wire. There is `NDI HX` and TLS-capable variants, but
   this binding only does the standard, in-the-clear sender.
-
-## Adding a Receiver (roadmap)
-
-The receiver is not implemented yet. To add it: bind
-`NDIlib_find_*` (mDNS discovery) and `NDIlib_recv_*` (frame pull) in
-`_lib.py`, then add a `receiver.py` that mirrors the shape of `sender.py`.
-Use a polling model (`recv_capture_v2` with a small timeout) for the
-public API.
 
 ## References
 

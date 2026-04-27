@@ -55,19 +55,70 @@ if _dll is None:
 # Constants
 # --------------------------------------------------------------------------- #
 
-# FourCC pixel formats
-FOURCC_BGRA = 0x41524742   # b'BGRA' little-endian
+# FourCC pixel formats (most common). NDI uses many more; these are enough
+# for sender BGRA/RGBA work and receiver BGRX_BGRA mode output.
+FOURCC_BGRA = 0x41524742   # b'BGRA' little-endian — 4 bytes/pixel, alpha
+FOURCC_BGRX = 0x58524742   # b'BGRX' little-endian — 4 bytes/pixel, alpha ignored
 FOURCC_RGBA = 0x41424752   # b'RGBA' little-endian
-FOURCC_BGRX = 0x58524742   # b'BGRX' (alpha ignored)
+FOURCC_RGBX = 0x58424752   # b'RGBX' little-endian
 
 # Frame format
 FRAME_FORMAT_PROGRESSIVE = 1
 
 # Pass 0 for timecode/timestamp → NDI synthesizes them automatically.
 
+# Receiver color format (NDIlib_recv_color_format_e)
+RECV_COLOR_BGRX_BGRA          = 0    # BGRX if no alpha, BGRA if alpha
+RECV_COLOR_UYVY_BGRA          = 1
+RECV_COLOR_RGBX_RGBA          = 2    # RGBX if no alpha, RGBA if alpha
+RECV_COLOR_UYVY_RGBA          = 3
+RECV_COLOR_BGRX_BGRA_FLIPPED  = 200
+RECV_COLOR_FASTEST            = 100
+RECV_COLOR_BEST               = 101
+
+# Receiver bandwidth (NDIlib_recv_bandwidth_e)
+RECV_BANDWIDTH_METADATA_ONLY  = -10
+RECV_BANDWIDTH_AUDIO_ONLY     = 10
+RECV_BANDWIDTH_LOWEST         = 0      # proxy / preview quality
+RECV_BANDWIDTH_HIGHEST        = 100    # full-rate video
+
+# Frame type returned by NDIlib_recv_capture_v2
+FRAME_TYPE_NONE          = 0
+FRAME_TYPE_VIDEO         = 1
+FRAME_TYPE_AUDIO         = 2
+FRAME_TYPE_METADATA      = 3
+FRAME_TYPE_ERROR         = 4
+FRAME_TYPE_STATUS_CHANGE = 100
+
 # --------------------------------------------------------------------------- #
 # Structs
 # --------------------------------------------------------------------------- #
+
+class NDIlib_source_t(ctypes.Structure):
+    """An NDI source on the network (returned by find, consumed by recv)."""
+    _fields_ = [
+        ("p_ndi_name",    ctypes.c_char_p),   # full source name, e.g. "MACHINE (My Source)"
+        ("p_url_address", ctypes.c_char_p),   # URL/IP — NULL for sources we create locally
+    ]
+
+
+class NDIlib_find_create_t(ctypes.Structure):
+    _fields_ = [
+        ("show_local_sources", ctypes.c_bool),  # include sources from THIS machine
+        ("p_groups",           ctypes.c_char_p),
+        ("p_extra_ips",        ctypes.c_char_p),
+    ]
+
+
+class NDIlib_recv_create_v3_t(ctypes.Structure):
+    _fields_ = [
+        ("source_to_connect_to", NDIlib_source_t),
+        ("color_format",         ctypes.c_int),
+        ("bandwidth",            ctypes.c_int),
+        ("allow_video_fields",   ctypes.c_bool),
+        ("p_ndi_recv_name",      ctypes.c_char_p),
+    ]
+
 
 class NDIlib_send_create_t(ctypes.Structure):
     _fields_ = [
@@ -98,12 +149,14 @@ class NDIlib_video_frame_v2_t(ctypes.Structure):
 # Function bindings
 # --------------------------------------------------------------------------- #
 
+# Library lifecycle
 _dll.NDIlib_initialize.restype  = ctypes.c_bool
 _dll.NDIlib_initialize.argtypes = []
 
 _dll.NDIlib_destroy.restype  = None
 _dll.NDIlib_destroy.argtypes = []
 
+# Sender
 _dll.NDIlib_send_create.restype  = ctypes.c_void_p
 _dll.NDIlib_send_create.argtypes = [ctypes.POINTER(NDIlib_send_create_t)]
 
@@ -112,6 +165,48 @@ _dll.NDIlib_send_destroy.argtypes = [ctypes.c_void_p]
 
 _dll.NDIlib_send_send_video_v2.restype  = None
 _dll.NDIlib_send_send_video_v2.argtypes = [
+    ctypes.c_void_p,
+    ctypes.POINTER(NDIlib_video_frame_v2_t),
+]
+
+# Find (mDNS source discovery)
+_dll.NDIlib_find_create_v2.restype  = ctypes.c_void_p
+_dll.NDIlib_find_create_v2.argtypes = [ctypes.POINTER(NDIlib_find_create_t)]
+
+_dll.NDIlib_find_destroy.restype  = None
+_dll.NDIlib_find_destroy.argtypes = [ctypes.c_void_p]
+
+# Returns a pointer to an array of NDIlib_source_t valid until the next call
+# to find_get_current_sources or until find_destroy. p_no_sources is filled
+# in with the count. The array itself is owned by the finder, do NOT free it.
+_dll.NDIlib_find_get_current_sources.restype  = ctypes.POINTER(NDIlib_source_t)
+_dll.NDIlib_find_get_current_sources.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)]
+
+_dll.NDIlib_find_wait_for_sources.restype  = ctypes.c_bool
+_dll.NDIlib_find_wait_for_sources.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+
+# Receiver
+_dll.NDIlib_recv_create_v3.restype  = ctypes.c_void_p
+_dll.NDIlib_recv_create_v3.argtypes = [ctypes.POINTER(NDIlib_recv_create_v3_t)]
+
+_dll.NDIlib_recv_destroy.restype  = None
+_dll.NDIlib_recv_destroy.argtypes = [ctypes.c_void_p]
+
+# Capture: returns NDIlib_frame_type_e. Pass NULL for the audio / metadata
+# pointers if you don't want them (saves NDI work). The pointed-to video
+# struct is filled in by NDI; the caller must release it via
+# NDIlib_recv_free_video_v2 before the next capture or before recv_destroy.
+_dll.NDIlib_recv_capture_v2.restype  = ctypes.c_int
+_dll.NDIlib_recv_capture_v2.argtypes = [
+    ctypes.c_void_p,
+    ctypes.POINTER(NDIlib_video_frame_v2_t),
+    ctypes.c_void_p,                                  # p_audio (unused: NULL)
+    ctypes.c_void_p,                                  # p_metadata (unused: NULL)
+    ctypes.c_uint32,                                  # timeout_ms
+]
+
+_dll.NDIlib_recv_free_video_v2.restype  = None
+_dll.NDIlib_recv_free_video_v2.argtypes = [
     ctypes.c_void_p,
     ctypes.POINTER(NDIlib_video_frame_v2_t),
 ]
