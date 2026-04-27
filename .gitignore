@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# NDI redistributables (NEVER commit — Vizrt licence forbids it)
+Processing.NDI.Lib.x64.dll
+Processing.NDI.Lib.x86.dll
+*.NDI.Lib.*.dll
+
+# Test images / video
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.mov

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ndi-for-python"
+version = "0.1.0"
+description = "Unofficial Python bindings for the NDI® SDK (Windows x64). Send video frames over NDI to TouchDesigner, OBS, Resolume, and other NDI-aware applications."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Unveil Studio" }]
+keywords = ["ndi", "video", "streaming", "vizrt", "touchdesigner", "obs", "resolume", "ctypes"]
+classifiers = [
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Multimedia :: Video :: Capture",
+]
+
+[project.urls]
+Repository = "https://github.com/UnveilStudio/NDIForPython"
+"NDI Runtime" = "https://ndi.video/download-ndi-sdk/"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["ndi*"]
