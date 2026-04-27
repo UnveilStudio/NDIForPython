@@ -2,7 +2,7 @@ include LICENSE
 include README.md
 include NDI_NOTICE.md
 include AGENTS.md
-recursive-include examples *.py
+recursive-include examples *.py *.bat
 
 # NEVER include the NDI runtime DLL — Vizrt licence forbids redistribution.
 global-exclude Processing.NDI.Lib.*.dll

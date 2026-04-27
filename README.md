@@ -105,7 +105,10 @@ called. If you need to keep the data, copy it first
 (`np.array(view)` or `view.copy()`).
 
 See [`examples/receive_example.py`](examples/receive_example.py) for a
-runnable discover-and-print-FPS loop.
+headless discover-and-print-FPS loop, or
+[`examples/preview_example.py`](examples/preview_example.py) for a live
+cv2 window. For a one-click demo (sender + preview in one go) just
+double-click [`examples/demo.bat`](examples/demo.bat).
 
 ## How it works
 
