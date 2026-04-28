@@ -1,3 +1,14 @@
+<p align="center">
+  <img src="assets/banner.png" alt="NDIForPython — Real-time NDI video for Python" width="100%" />
+</p>
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-0078D6?logo=windows">
+  <img alt="NDI Runtime" src="https://img.shields.io/badge/NDI%20Runtime-5%20%2F%206-5ac8e6">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+</p>
+
 # NDIForPython
 
 Python bindings for [NDI®](https://ndi.video) — real-time, low-latency video
@@ -13,6 +24,34 @@ same LAN.
 
 **Windows x64 only** at the moment (`Processing.NDI.Lib.x64.dll`).
 Linux/macOS support is feasible but not implemented yet — PRs welcome.
+
+## How it works
+
+```mermaid
+flowchart LR
+    APP[Your Python code] --> SDR[ndi.NDISender]
+    APP --> RCV[ndi.NDIReceiver]
+    APP --> FND[ndi.NDISourceFinder]
+    SDR --> LIB[ndi._lib<br/>ctypes flat C API]
+    RCV --> LIB
+    FND --> LIB
+    LIB --> DLL[Processing.NDI.Lib.x64.dll<br/>NDI Runtime 5/6]
+    DLL --> NET[mDNS discovery +<br/>RTP-like UDP/TCP]
+    NET -.-> EXT[TouchDesigner / OBS<br/>Resolume / vMix / VLC<br/>Unreal / Unity / Notch]
+    NET -.-> EXT2[any NDI-aware<br/>app on the LAN]
+
+    classDef py fill:#0e2233,stroke:#5ac8e6,stroke-width:2px,color:#fff
+    classDef sys fill:#0d1117,stroke:#444,color:#fff
+    classDef net fill:#103247,stroke:#5ac8e6,stroke-width:2px,color:#fff
+    class APP,SDR,RCV,FND,LIB py
+    class DLL,EXT,EXT2 sys
+    class NET net
+```
+
+NDI's C API is flat — no vtable, no DX/GL interop, just `ctypes.CDLL`
+and structs. The wire protocol travels over the LAN, so any Python
+process can publish to (and consume from) any NDI-aware client on the
+same network.
 
 ---
 
