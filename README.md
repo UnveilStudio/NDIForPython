@@ -7,6 +7,7 @@
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20x64-0078D6?logo=windows">
   <img alt="NDI Runtime" src="https://img.shields.io/badge/NDI%20Runtime-5%20%2F%206-5ac8e6">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+  <a href="AGENTS.md"><img alt="Agent-friendly" src="https://img.shields.io/badge/agent--friendly-yes-7c3aed"></a>
 </p>
 
 # NDIForPython
@@ -52,6 +53,22 @@ NDI's C API is flat — no vtable, no DX/GL interop, just `ctypes.CDLL`
 and structs. The wire protocol travels over the LAN, so any Python
 process can publish to (and consume from) any NDI-aware client on the
 same network.
+
+## Agent-friendly
+
+This repo is designed to be picked up by AI coding agents (Claude Code,
+Cursor, Copilot, …) on the first try without spelunking the source:
+
+- [`AGENTS.md`](AGENTS.md) — TL;DR + sender/finder/receiver patterns,
+  install steps (NDI Runtime + `pip install`), common pitfalls.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — grounded mental map
+  of the binding (struct sizes, function bindings, lifecycle, frame
+  data model, comparison vs spout2-python), every claim cross-checked
+  against `tests/`.
+- [`tests/`](tests/) — runnable audits (DLL load + struct + FourCC
+  validation, end-to-end loopback with byte-exact pattern assertion,
+  format-conversion variants) so an agent can verify behavior on the
+  target machine before generating code.
 
 ---
 
