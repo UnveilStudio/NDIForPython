@@ -1,0 +1,167 @@
+[
+  {
+    "label": "DLL path esiste",
+    "ok": true,
+    "value": "C:\\Program Files\\NDI\\NDI 6 Runtime\\v6\\Processing.NDI.Lib.x64.dll"
+  },
+  {
+    "label": "ndi loadable",
+    "ok": true,
+    "value": ""
+  },
+  {
+    "label": "init() True (gia chiamato)",
+    "ok": true,
+    "value": "_lib.py chiama NDIlib_initialize all'import"
+  },
+  {
+    "label": "FOURCC_BGRA = 0x41524742 -> b'BGRA'",
+    "ok": true,
+    "value": ""
+  },
+  {
+    "label": "FOURCC_BGRX = 0x58524742 -> b'BGRX'",
+    "ok": true,
+    "value": ""
+  },
+  {
+    "label": "FOURCC_RGBA = 0x41424752 -> b'RGBA'",
+    "ok": true,
+    "value": ""
+  },
+  {
+    "label": "FOURCC_RGBX = 0x58424752 -> b'RGBX'",
+    "ok": true,
+    "value": ""
+  },
+  {
+    "label": "NDIlib_source_t: 2 fields, sizeof=16",
+    "ok": true,
+    "value": "(2/2)"
+  },
+  {
+    "label": "NDIlib_find_create_t: 3 fields, sizeof=24",
+    "ok": true,
+    "value": "(3/3)"
+  },
+  {
+    "label": "NDIlib_recv_create_v3_t: 5 fields, sizeof=40",
+    "ok": true,
+    "value": "(5/5)"
+  },
+  {
+    "label": "NDIlib_send_create_t: 4 fields, sizeof=24",
+    "ok": true,
+    "value": "(4/4)"
+  },
+  {
+    "label": "NDIlib_video_frame_v2_t: 12 fields, sizeof=72",
+    "ok": true,
+    "value": "(12/12)"
+  },
+  {
+    "label": "NDIlib_initialize -> <class 'ctypes.c_bool'>",
+    "ok": true,
+    "value": "argtypes=[]"
+  },
+  {
+    "label": "NDIlib_destroy -> None",
+    "ok": true,
+    "value": "argtypes=[]"
+  },
+  {
+    "label": "NDIlib_send_create -> <class 'ctypes.c_void_p'>",
+    "ok": true,
+    "value": "argtypes=['LP_NDIlib_send_create_t']"
+  },
+  {
+    "label": "NDIlib_send_destroy -> None",
+    "ok": true,
+    "value": "argtypes=['c_void_p']"
+  },
+  {
+    "label": "NDIlib_send_send_video_v2 -> None",
+    "ok": true,
+    "value": "argtypes=['c_void_p', 'LP_NDIlib_video_frame_v2_t']"
+  },
+  {
+    "label": "NDIlib_find_create_v2 -> <class 'ctypes.c_void_p'>",
+    "ok": true,
+    "value": "argtypes=['LP_NDIlib_find_create_t']"
+  },
+  {
+    "label": "NDIlib_find_destroy -> None",
+    "ok": true,
+    "value": "argtypes=['c_void_p']"
+  },
+  {
+    "label": "NDIlib_find_get_current_sources -> <class 'ndi._lib.LP_NDIlib_source_t'>",
+    "ok": true,
+    "value": "argtypes=['c_void_p', 'LP_c_ulong']"
+  },
+  {
+    "label": "NDIlib_find_wait_for_sources -> <class 'ctypes.c_bool'>",
+    "ok": true,
+    "value": "argtypes=['c_void_p', 'c_ulong']"
+  },
+  {
+    "label": "NDIlib_recv_create_v3 -> <class 'ctypes.c_void_p'>",
+    "ok": true,
+    "value": "argtypes=['LP_NDIlib_recv_create_v3_t']"
+  },
+  {
+    "label": "NDIlib_recv_destroy -> None",
+    "ok": true,
+    "value": "argtypes=['c_void_p']"
+  },
+  {
+    "label": "NDIlib_recv_capture_v2 -> <class 'ctypes.c_long'>",
+    "ok": true,
+    "value": "argtypes=['c_void_p', 'LP_NDIlib_video_frame_v2_t', 'c_void_p', 'c_void_p', 'c_ulong']"
+  },
+  {
+    "label": "NDIlib_recv_free_video_v2 -> None",
+    "ok": true,
+    "value": "argtypes=['c_void_p', 'LP_NDIlib_video_frame_v2_t']"
+  },
+  {
+    "label": "NDISender create",
+    "ok": true,
+    "value": "0x26340453ef0"
+  },
+  {
+    "label": "repr non crasha",
+    "ok": true,
+    "value": "<NDISender name='AuditSender' fps=60/1>"
+  },
+  {
+    "label": "NDISender release idempotent",
+    "ok": true,
+    "value": ""
+  },
+  {
+    "label": "NDISender release 2nd time no crash",
+    "ok": true,
+    "value": ""
+  },
+  {
+    "label": "NDISourceFinder create",
+    "ok": true,
+    "value": "0x2633e652b50"
+  },
+  {
+    "label": "get_sources non-blocking",
+    "ok": true,
+    "value": "got 0 sources"
+  },
+  {
+    "label": "Finder release idempotent",
+    "ok": true,
+    "value": ""
+  },
+  {
+    "label": "send_frame chiamato 3 volte (no crash)",
+    "ok": true,
+    "value": ""
+  }
+]

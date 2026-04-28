@@ -11,9 +11,10 @@ build/
 venv/
 env/
 
-# IDE
+# IDE / agent config
 .vscode/
 .idea/
+.claude/
 
 # NDI redistributables (NEVER commit — Vizrt licence forbids it)
 Processing.NDI.Lib.x64.dll
