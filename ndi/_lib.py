@@ -5,6 +5,7 @@ The NDI C API is a flat set of exported functions (no vtable), so binding is
 straightforward. We initialize the library once at import time and expose the
 relevant structs and function handles.
 """
+import atexit
 import ctypes
 import os
 import sys
@@ -217,3 +218,27 @@ _dll.NDIlib_recv_free_video_v2.argtypes = [
 
 if not _dll.NDIlib_initialize():
     raise RuntimeError("NDIlib_initialize() returned False — NDI library failed to start")
+
+# Match the SDK's expected lifecycle: every NDIlib_initialize must be paired
+# with NDIlib_destroy. Using atexit avoids relying on __del__ ordering at
+# interpreter shutdown.
+atexit.register(_dll.NDIlib_destroy)
+
+
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
+
+def _to_cstr(s):
+    """Encode an optional Python str as UTF-8 bytes for c_char_p, or None."""
+    return s.encode("utf-8") if s else None
+
+
+# Bytes per pixel for the FourCCs we support. Used by NDIVideoFrame.as_numpy
+# to refuse unsupported planar/packed formats (e.g. UYVY at 2 bpp).
+BYTES_PER_PIXEL = {
+    FOURCC_BGRA: 4,
+    FOURCC_BGRX: 4,
+    FOURCC_RGBA: 4,
+    FOURCC_RGBX: 4,
+}

@@ -9,7 +9,7 @@ Usage::
     with NDIReceiver("MACHINE-NAME (My Source)", connect_timeout_ms=5000) as rx:
         while running:
             with rx.receive(timeout_ms=33) as frame:
-                if frame is None:
+                if not frame:
                     continue
                 # frame.width, frame.height, frame.fourcc, frame.data_ptr
                 # frame.copy_to(buffer)              — copy into a bytearray
@@ -17,10 +17,15 @@ Usage::
                 process(frame)
 """
 import ctypes
-import time
-from typing import Optional
 
 from . import _lib
+from ._base import _NDIHandle
+
+# NumPy is optional — only NDIVideoFrame.as_numpy() needs it.
+try:
+    import numpy as _np
+except ImportError:
+    _np = None
 
 # Re-exported here for convenience so users don't need to also import _lib.
 RECV_COLOR_BGRX_BGRA  = _lib.RECV_COLOR_BGRX_BGRA
@@ -96,26 +101,32 @@ class NDIVideoFrame:
     def as_numpy(self):
         """
         Return a zero-copy NumPy view of the pixel buffer, shape
-        ``(height, line_stride // 4, 4)`` for 4-byte pixel formats. Slice to
-        ``[:, :width, :]`` if ``line_stride > width * 4``.
+        ``(height, line_stride // bpp, bpp)``. For BGRA/BGRX/RGBA/RGBX the
+        last axis is 4. Slice to ``[:, :width, :]`` if
+        ``line_stride > width * bpp`` (line padding).
 
-        WARNING: the view is invalidated when this frame is released
-        (i.e. when the ``with`` block exits or :meth:`release` is called).
-        Either copy the data out before release, or call ``np.array(view)``
-        to materialise a copy.
+        Raises ``NotImplementedError`` for non-4-bytes-per-pixel formats
+        (UYVY, planar formats etc.) — the SDK can deliver these when the
+        receiver is created with ``RECV_COLOR_FASTEST``; in that case prefer
+        ``RECV_COLOR_BGRX_BGRA``.
 
-        Requires NumPy. Raises ``ImportError`` if NumPy is not installed.
+        WARNING: the view is invalidated when this frame is released (the
+        ``with`` block exit, or :meth:`release`). Materialise with
+        ``np.array(view)`` if you need to keep it around.
         """
-        import numpy as np                                          # local import
-        bytes_per_pixel = 4                                          # for BGRA/BGRX/RGBA/RGBX
+        if _np is None:
+            raise ImportError("NumPy is required for NDIVideoFrame.as_numpy()")
+        bpp = _lib.BYTES_PER_PIXEL.get(self.fourcc)
+        if bpp is None:
+            raise NotImplementedError(
+                f"as_numpy() does not support FourCC 0x{self.fourcc:08x}; "
+                "create the receiver with color_format=RECV_COLOR_BGRX_BGRA "
+                "or RECV_COLOR_RGBX_RGBA to force a 4-byte-per-pixel format."
+            )
         rows = self.height
-        cols = self.line_stride // bytes_per_pixel
-        # ctypes type for an array of (rows * line_stride) bytes at data_ptr.
-        ArrayType = (ctypes.c_ubyte * (rows * self.line_stride))
-        raw = ArrayType.from_address(self.data_ptr)
-        # NumPy view, shape (H, W_padded, 4). Caller can do view[:, :width] to
-        # drop any line-stride padding columns.
-        return np.frombuffer(raw, dtype=np.uint8).reshape(rows, cols, bytes_per_pixel)
+        cols = self.line_stride // bpp
+        raw = (ctypes.c_ubyte * (rows * self.line_stride)).from_address(self.data_ptr)
+        return _np.frombuffer(raw, dtype=_np.uint8).reshape(rows, cols, bpp)
 
     # ------------------------------------------------------------------ #
 
@@ -156,7 +167,7 @@ _NO_FRAME = _NoFrame()
 # Receiver
 # --------------------------------------------------------------------------- #
 
-class NDIReceiver:
+class NDIReceiver(_NDIHandle):
     """
     Connect to an NDI sender by name and pull video frames.
 
@@ -164,21 +175,19 @@ class NDIReceiver:
     ----------
     source_name : str
         Full NDI source name as advertised on the network, e.g.
-        ``"MACHINE-NAME (My Source)"``. The receiver will run an internal
-        finder to resolve this to an actual network endpoint. If the source
-        is not visible within ``connect_timeout_ms`` a
-        :class:`TimeoutError` is raised.
+        ``"MACHINE-NAME (My Source)"``. The receiver runs an internal finder
+        to resolve this to a network endpoint. If the source isn't visible
+        within ``connect_timeout_ms`` a :class:`TimeoutError` is raised.
     color_format : int
         One of ``RECV_COLOR_BGRX_BGRA`` (default — 4 bytes/pixel, alpha if
         the sender provides one), ``RECV_COLOR_RGBX_RGBA``,
-        ``RECV_COLOR_FASTEST`` (lowest CPU, may pick UYVY), or
-        ``RECV_COLOR_BEST``.
+        ``RECV_COLOR_FASTEST`` (lowest CPU, may pick UYVY — incompatible
+        with :meth:`NDIVideoFrame.as_numpy`), or ``RECV_COLOR_BEST``.
     bandwidth : int
         ``RECV_BANDWIDTH_HIGHEST`` (default, full quality) or
         ``RECV_BANDWIDTH_LOWEST`` (proxy preview, much smaller frames).
     recv_name : str
-        Local label for this receiver, shown to the sender side. Defaults
-        to ``"NDIForPython recv"``.
+        Local label for this receiver, shown to the sender side.
     allow_video_fields : bool
         If False (default), interlaced sources are de-interlaced into
         single progressive frames before delivery.
@@ -186,6 +195,8 @@ class NDIReceiver:
         How long to wait for ``source_name`` to be discovered on the LAN
         before raising ``TimeoutError``. Default 5000 ms.
     """
+
+    _destroy_fn = staticmethod(_lib._dll.NDIlib_recv_destroy)
 
     def __init__(
         self,
@@ -196,32 +207,13 @@ class NDIReceiver:
         allow_video_fields: bool = False,
         connect_timeout_ms: int  = 5000,
     ):
-        self._instance = None
-        # Discovery first — resolve source_name to a NDIlib_source_t the SDK
-        # knows about. Without this, recv_create can fail silently for
-        # senders that haven't been seen yet.
+        super().__init__()
+        # Discovery: resolve source_name to an NDIlib_source_t the SDK
+        # recognises. Without this, recv_create can fail silently for
+        # senders that haven't been seen on the network yet.
         from .finder import NDISourceFinder
-        match: Optional[_lib.NDIlib_source_t] = None
-        deadline = time.monotonic() + connect_timeout_ms / 1000.0
         with NDISourceFinder(show_local_sources=True) as finder:
-            while time.monotonic() < deadline and match is None:
-                # 200 ms wait per loop — keeps shutdown responsive.
-                slice_ms = min(200, max(1, int((deadline - time.monotonic()) * 1000)))
-                _lib._dll.NDIlib_find_wait_for_sources(finder._instance, slice_ms)
-                count = ctypes.c_uint32(0)
-                ptr = _lib._dll.NDIlib_find_get_current_sources(finder._instance, ctypes.byref(count))
-                if not ptr or count.value == 0:
-                    continue
-                wanted = source_name.encode("utf-8")
-                for i in range(count.value):
-                    if ptr[i].p_ndi_name and ptr[i].p_ndi_name == wanted:
-                        # Copy the struct into one we own — the finder's
-                        # array is invalidated on the next find call.
-                        match = _lib.NDIlib_source_t(
-                            p_ndi_name=ptr[i].p_ndi_name,
-                            p_url_address=ptr[i].p_url_address,
-                        )
-                        break
+            match = finder.find_source(source_name, timeout_ms=connect_timeout_ms)
         if match is None:
             raise TimeoutError(
                 f"NDI source {source_name!r} not found on the network within "
@@ -234,7 +226,7 @@ class NDIReceiver:
             color_format=color_format,
             bandwidth=bandwidth,
             allow_video_fields=allow_video_fields,
-            p_ndi_recv_name=recv_name.encode("utf-8"),
+            p_ndi_recv_name=_lib._to_cstr(recv_name),
         )
         self._instance = _lib._dll.NDIlib_recv_create_v3(ctypes.byref(settings))
         if not self._instance:
@@ -246,13 +238,13 @@ class NDIReceiver:
     def receive(self, timeout_ms: int = 33):
         """
         Pull one frame. Returns either an :class:`NDIVideoFrame` (truthy,
-        context-manager) or a falsy ``NoFrame`` placeholder if no video
-        arrived in ``timeout_ms``.
+        context-manager) or a falsy placeholder if no video arrived in
+        ``timeout_ms``.
 
         Recommended usage::
 
             with rx.receive(timeout_ms=33) as frame:
-                if frame is None:
+                if not frame:
                     continue
                 process(frame)         # frame freed automatically on exit
 
@@ -265,7 +257,7 @@ class NDIReceiver:
             ctypes.byref(video),
             None,                        # no audio
             None,                        # no metadata
-            ctypes.c_uint32(timeout_ms),
+            timeout_ms,
         )
         if ftype == _lib.FRAME_TYPE_VIDEO:
             return NDIVideoFrame(self._instance, video)
@@ -273,23 +265,6 @@ class NDIReceiver:
         return _NO_FRAME
 
     # ------------------------------------------------------------------ #
-
-    def release(self) -> None:
-        if self._instance:
-            _lib._dll.NDIlib_recv_destroy(self._instance)
-            self._instance = None
-
-    def __enter__(self) -> "NDIReceiver":
-        return self
-
-    def __exit__(self, *_) -> None:
-        self.release()
-
-    def __del__(self) -> None:
-        try:
-            self.release()
-        except Exception:
-            pass
 
     def __repr__(self) -> str:
         return f"<NDIReceiver source={self._source_name!r} instance={self._instance}>"

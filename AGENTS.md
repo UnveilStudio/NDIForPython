@@ -44,7 +44,9 @@ with NDISender("MySource", fps_n=FPS) as nd:
 Notes:
 - Reuse `buf` between frames — do not re-allocate per frame.
 - `send_frame` accepts an integer address OR a `ctypes.c_void_p`.
-- `send_frame` is non-blocking — NDI hands off to a worker thread internally.
+- `send_frame` is synchronous on the buffer: it returns once NDI has consumed
+  the data, so the caller can mutate or free the buffer right after. The
+  actual network send happens on an internal worker thread.
 - Use the context manager (`with ... as`) so `NDIlib_send_destroy` runs.
 
 ## NumPy / PyTorch zero-copy

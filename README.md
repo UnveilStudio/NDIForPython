@@ -194,8 +194,10 @@ be `width * 4` (tightly packed, no padding).
 
 - **Reuse the buffer.** Allocating `(c_ubyte * size)()` per frame at 60 fps
   is wasteful. Allocate once outside the loop and write into it.
-- **`send_frame` is non-blocking.** It hands the frame to NDI's worker
-  thread and returns immediately. NDI handles network throttling internally.
+- **`send_frame` returns once NDI has consumed the buffer.** It uses
+  `NDIlib_send_send_video_v2`, which is synchronous in terms of buffer
+  ownership — you can mutate or free the buffer right after the call
+  returns. The actual network send happens on an internal worker thread.
 - **For NumPy / PyTorch tensors**, use `tensor.contiguous()` then
   `(c_ubyte * size).from_buffer(arr)` to get a zero-copy view. Make sure the
   array is `uint8` and BGRA-ordered (or pass `FOURCC_RGBA`).
